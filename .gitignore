@@ -81,3 +81,6 @@ typings/
 
 # vscode config
 .vscode
+
+# screenshot demo jpg
+shot.jpg
