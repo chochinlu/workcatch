@@ -1,56 +1,81 @@
-// Modules to control application life and create native browser window
-const {app, BrowserWindow} = require('electron')
+'use strict';
 
-// Keep a global reference of the window object, if you don't, the window will
-// be closed automatically when the JavaScript object is garbage collected.
-let mainWindow
+var path = require('path')
+var electron = require('electron');
+var BrowserWindow = electron.BrowserWindow;
+const {app, Tray} = require('electron');
 
-function createWindow () {
-  // Create the browser window.
-  mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-      nodeIntegration: true
+var trayIcon = null;
+var window = null;
+
+const WINDOW_WIDTH = 400;
+const WINDOW_HEIGHT = 150;
+const HORIZ_PADDING = 0;
+const VERT_PADDING = 0;
+
+app.on('ready', function() {
+  
+  if(process.platform === 'darwin') app.dock.hide();
+
+  window = new BrowserWindow({
+    width: WINDOW_WIDTH,
+    height: WINDOW_HEIGHT,
+    resizable: false,
+    frame: false,
+    transparent: false,
+    show: false
+  });
+
+  window.loadURL('file://' + __dirname + '/index.html');
+
+  window.on('close', function () {
+    window = null;
+  });
+
+  window.on('blur', function(){
+    window.hide();
+  });
+
+  const iconName = 'images/icon.png';
+  const iconPath = path.join(__dirname, iconName);
+
+  trayIcon = new Tray(iconPath);
+  trayIcon.setToolTip('Hello World');
+
+  trayIcon.on('click', (event) => {
+    var screen = electron.screen;
+    const cursorPosition = screen.getCursorScreenPoint();
+    const primarySize = screen.getPrimaryDisplay().workAreaSize;
+    const trayPositionVert = cursorPosition.y >= primarySize.height/2 ? 'bottom' : 'top';  
+    const trayPositionHoriz = cursorPosition.x >= primarySize.width/2 ? 'right' : 'left';  
+    window.setPosition(getTrayPosX(),  getTrayPosY());
+    window.isVisible() ? window.hide() : window.show();
+
+    function getTrayPosX() {
+      const horizBounds = {
+        left:   cursorPosition.x - WINDOW_WIDTH/2,
+        right:  cursorPosition.x + WINDOW_WIDTH/2
+      }
+      if (trayPositionHoriz == 'left') {
+        return horizBounds.left <= HORIZ_PADDING ? HORIZ_PADDING : horizBounds.left;
+      }
+      else {
+        return horizBounds.right >= primarySize.width ? primarySize.width - HORIZ_PADDING - WINDOW_WIDTH: horizBounds.right - WINDOW_WIDTH;
+      }
+    }    
+    function getTrayPosY() {
+      return trayPositionVert == 'bottom' ? cursorPosition.y - WINDOW_HEIGHT - VERT_PADDING : cursorPosition.y + VERT_PADDING;
     }
-  })
+  });
 
-  // and load the index.html of the app.
-  mainWindow.loadFile('index.html')
+  const {Menu, MenuItem} = require('electron');
+  var menu = new Menu();
 
-  // Open the DevTools.
-  // mainWindow.webContents.openDevTools()
+  menu.append(new MenuItem({ label: 'Quit', click: () => app.quit() }));
 
-  // Emitted when the window is closed.
-  mainWindow.on('closed', function () {
-    // Dereference the window object, usually you would store windows
-    // in an array if your app supports multi windows, this is the time
-    // when you should delete the corresponding element.
-    mainWindow = null
-  })
-}
+  var ipcMain = require('electron').ipcMain;
+  ipcMain.on('show-config-menu', (event) => {
+      menu.popup(window);
+  });
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', createWindow)
-
-// Quit when all windows are closed.
-app.on('window-all-closed', function () {
-  // On macOS it is common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
-})
-
-app.on('activate', function () {
-  // On macOS it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (mainWindow === null) {
-    createWindow()
-  }
-})
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
+});
